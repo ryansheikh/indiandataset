@@ -2,25 +2,45 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import os
 
+# ==================================
+# Page Config
+# ==================================
 st.set_page_config(page_title="Weather ML Dashboard", layout="wide")
-
 st.title("🌦 Weather Prediction & Risk Dashboard")
 
-# ===============================
-# Load Models
-# ===============================
+# ==================================
+# Get Current Directory (IMPORTANT for deployment)
+# ==================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+TEMP_MODEL_PATH = os.path.join(BASE_DIR, "final_temperature_model.pkl")
+RAIN_MODEL_PATH = os.path.join(BASE_DIR, "final_rain_model.pkl")
+
+# ==================================
+# Load Models (Cached)
+# ==================================
 @st.cache_resource
 def load_models():
-    temp_model = joblib.load("final_temperature_model.pkl")
-    rain_model = joblib.load("final_rain_model.pkl")
-    return temp_model, rain_model
+    try:
+        temp_model = joblib.load(TEMP_MODEL_PATH)
+        rain_model = joblib.load(RAIN_MODEL_PATH)
+        return temp_model, rain_model
+    except Exception as e:
+        st.error("Model loading failed. Please check .pkl files.")
+        st.error(str(e))
+        return None, None
 
 temp_model, rain_model = load_models()
 
-# ===============================
+# Stop app if models not loaded
+if temp_model is None or rain_model is None:
+    st.stop()
+
+# ==================================
 # Sidebar Navigation
-# ===============================
+# ==================================
 option = st.sidebar.selectbox(
     "Select Task",
     [
@@ -29,9 +49,9 @@ option = st.sidebar.selectbox(
     ]
 )
 
-# ===============================
-# Common Input Fields
-# ===============================
+# ==================================
+# User Input Function
+# ==================================
 def user_inputs():
     maxtempC = st.number_input("Max Temperature (°C)", value=35.0)
     mintempC = st.number_input("Min Temperature (°C)", value=25.0)
@@ -67,30 +87,36 @@ def user_inputs():
 
     return data
 
-# ===============================
+# ==================================
 # Temperature Prediction
-# ===============================
+# ==================================
 if option == "Temperature Prediction":
     st.subheader("🌡 Predict Temperature")
-
     input_df = user_inputs()
 
     if st.button("Predict Temperature"):
-        prediction = temp_model.predict(input_df)[0]
-        st.success(f"Predicted Temperature: {prediction:.2f} °C")
+        try:
+            prediction = temp_model.predict(input_df)[0]
+            st.success(f"Predicted Temperature: {prediction:.2f} °C")
+        except Exception as e:
+            st.error("Prediction failed")
+            st.error(str(e))
 
-# ===============================
+# ==================================
 # Rain Prediction
-# ===============================
+# ==================================
 if option == "Rain Prediction":
     st.subheader("🌧 Predict Rain (Yes/No)")
-
     input_df = user_inputs()
 
     if st.button("Predict Rain"):
-        prediction = rain_model.predict(input_df)[0]
+        try:
+            prediction = rain_model.predict(input_df)[0]
 
-        if prediction == 1:
-            st.error("Rain Expected 🌧")
-        else:
-            st.success("No Rain Expected ☀")
+            if prediction == 1:
+                st.error("Rain Expected 🌧")
+            else:
+                st.success("No Rain Expected ☀")
+        except Exception as e:
+            st.error("Prediction failed")
+            st.error(str(e))
